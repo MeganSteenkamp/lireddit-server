@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { MikroORM } from '@mikro-orm/core';
-import { __prod__ } from './constants';
+import { COOKIE_NAME, __prod__ } from './constants';
 import microConfig from './mikro-orm.config';
 import expressConfig from './express-session.config';
 import express from 'express';
@@ -31,7 +31,7 @@ const main = async () => {
       credentials: true,
     }),
     session({
-      name: 'qid',
+      name: COOKIE_NAME,
       store: new pgSession({
         pool: pgPool,
       }),
