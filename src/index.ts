@@ -11,6 +11,7 @@ import { MyContext } from './types';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
 import pg from 'pg';
+import cors from 'cors';
 
 const main = async () => {
   const orm = await MikroORM.init(microConfig);
@@ -26,10 +27,14 @@ const main = async () => {
     connectionString:
       // TODO: Change to env variables
       // postgres://${process.env.USER}:${process.env.PASSWORD}@${process.env.HOST}:${process.env.PORT}/${process.env.DATABASE}`
-      "postgres://postgres:Password123@localhost:5432/lireddit",
+      'postgres://postgres:Password123@localhost:5432/lireddit',
   });
 
   app.use(
+    cors({
+      origin: 'http://localhost:3000',
+      credentials: true,
+    }),
     session({
       name: 'qid',
       store: new pgSession({
@@ -54,7 +59,10 @@ const main = async () => {
     context: ({ req, res }): MyContext => ({ em: orm.em, req, res }), // Having req allows us to access sessions
   });
 
-  apolloServer.applyMiddleware({ app }); // creates graphQL endpoint on Express
+  apolloServer.applyMiddleware({
+    app,
+    cors: false,
+  }); // creates graphQL endpoint on Express
 
   app.listen(4000, () => {
     console.log('server started on localhost: 4000');
