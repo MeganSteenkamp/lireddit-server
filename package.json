@@ -5,10 +5,9 @@
   "main": "index.js",
   "scripts": {
     "watch": "tsc -w",
-    "dev": "nodemon dist/index.js",
+    "dev": "set NODE_ENV=dev.env && nodemon dist/index.js",
     "start": "node dist/index.js",
     "start2": "ts-node src/index.ts",
-    "dev2": "nodemon --exec ts-node src/index.ts",
     "create:migration": "mikro-orm migration:create"
   },
   "repository": {
@@ -41,6 +40,7 @@
     "argon2": "^0.27.2",
     "connect-pg-simple": "^6.2.1",
     "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "express-session": "^1.17.1",
     "graphql": "^15.5.0",

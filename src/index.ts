@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { MikroORM } from '@mikro-orm/core';
 import { __prod__ } from './constants';
 import microConfig from './mikro-orm.config';
+import expressConfig from './express-session.config';
 import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { buildSchema } from 'type-graphql';
@@ -15,20 +16,14 @@ import cors from 'cors';
 
 const main = async () => {
   const orm = await MikroORM.init(microConfig);
+  console.log(microConfig);
   await orm.getMigrator().up();
 
   const app = express();
 
   // Lines 22-48 for setting up session storage cookies with postgres
   const pgSession = connectPg(session);
-  const pgPool = new pg.Pool({
-    host: 'localhost',
-    user: 'postgres',
-    connectionString:
-      // TODO: Change to env variables
-      // postgres://${process.env.USER}:${process.env.PASSWORD}@${process.env.HOST}:${process.env.PORT}/${process.env.DATABASE}`
-      'postgres://postgres:Password123@localhost:5432/lireddit',
-  });
+  const pgPool = new pg.Pool(expressConfig);
 
   app.use(
     cors({
