@@ -16,7 +16,6 @@ import cors from 'cors';
 
 const main = async () => {
   const orm = await MikroORM.init(microConfig);
-  console.log(microConfig);
   await orm.getMigrator().up();
 
   const app = express();
@@ -24,6 +23,9 @@ const main = async () => {
   // Lines 22-48 for setting up session storage cookies with postgres
   const pgSession = connectPg(session);
   const pgPool = new pg.Pool(expressConfig);
+
+  console.log('express config: ');
+  console.log(expressConfig);
 
   app.use(
     cors({

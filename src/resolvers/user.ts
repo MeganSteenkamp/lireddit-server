@@ -5,12 +5,14 @@ import {
   Arg,
   Ctx,
   Mutation,
-  InputType,
   Field,
   ObjectType,
   Query,
 } from 'type-graphql';
 import argon2 from 'argon2';
+import { EntityManager } from '@mikro-orm/postgresql';
+import { UsernamePasswordInput } from './UsernamePasswordInput';
+import { validateRegister } from '../utils/validateRegister';
 
 // Needed to declare custom properties on an express session
 // See: https://stackoverflow.com/questions/65108033/property-user-does-not-exist-on-type-session-partialsessiondata
@@ -18,15 +20,6 @@ declare module 'express-session' {
   export interface SessionData {
     userId: number;
   }
-}
-
-@InputType()
-class UsernamePasswordInput {
-  @Field()
-  username: string;
-
-  @Field()
-  password: string;
 }
 
 @ObjectType()
@@ -49,6 +42,7 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+
   @Query(() => User, { nullable: true })
   async me(@Ctx() { em, req }: MyContext) {
     if (!req.session.userId) {
@@ -64,36 +58,26 @@ export class UserResolver {
     @Arg('options') options: UsernamePasswordInput,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    if (options.username.length <= 2) {
-      return {
-        errors: [
-          {
-            field: 'username',
-            message: 'length must be greater than 2',
-          },
-        ],
-      };
-    }
-
-    // Could use a validation library here
-    if (options.password.length <= 2) {
-      return {
-        errors: [
-          {
-            field: 'password',
-            message: 'length must be greater than 2',
-          },
-        ],
-      };
+    const errors = validateRegister(options);
+    if (errors) {
+      return { errors };
     }
 
     const hashedPassword = await argon2.hash(options.password);
-    const user = em.create(User, {
-      username: options.username,
-      password: hashedPassword,
-    });
+    let user;
     try {
-      await em.persistAndFlush(user);
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: options.username,
+          email: options.email,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning('*'); // return all fields
+      user = result[0];
     } catch (err) {
       if (err.code === '23505') {
         return {
@@ -113,21 +97,27 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async login(
-    @Arg('options') options: UsernamePasswordInput,
+    @Arg('usernameOrEmail') usernameOrEmail: string,
+    @Arg('password') password: string,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    const user = await em.findOne(User, { username: options.username });
+    const user = await em.findOne(
+      User,
+      usernameOrEmail.includes('@')
+        ? { email: usernameOrEmail }
+        : { username: usernameOrEmail }
+    );
     if (!user) {
       return {
         errors: [
           {
-            field: 'username',
-            message: 'username does not exist',
+            field: 'usernameOrEmail',
+            message: 'username or email does not exist',
           },
         ],
       };
     }
-    const valid = await argon2.verify(user.password, options.password);
+    const valid = await argon2.verify(user.password, password);
     if (!valid) {
       return {
         errors: [
@@ -138,9 +128,7 @@ export class UserResolver {
         ],
       };
     }
-
     req.session!.userId = user.id;
-
     return { user };
   }
 
