@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { MikroORM } from '@mikro-orm/core';
-import { COOKIE_NAME, __prod__ } from './constants';
+import { COOKIE_NAME, EXPRESS_SECRET, __prod__ } from './constants';
 import microConfig from './mikro-orm.config';
 import expressConfig from './express-session.config';
 import express from 'express';
@@ -11,7 +11,7 @@ import { UserResolver } from './resolvers/user';
 import { MyContext } from './types';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
-import pg from 'pg';
+import { Pool } from 'pg';
 import cors from 'cors';
 
 const main = async () => {
@@ -22,10 +22,7 @@ const main = async () => {
 
   // Lines 22-48 for setting up session storage cookies with postgres
   const pgSession = connectPg(session);
-  const pgPool = new pg.Pool(expressConfig);
-
-  console.log('express config: ');
-  console.log(expressConfig);
+  const pgPool = new Pool(expressConfig);
 
   app.use(
     cors({
@@ -37,7 +34,7 @@ const main = async () => {
       store: new pgSession({
         pool: pgPool,
       }),
-      secret: 'keyboard cat', // Wouldn't actually use this
+      secret: EXPRESS_SECRET, // Wouldn't actually use this
       resave: false,
       saveUninitialized: false,
       cookie: {
@@ -53,7 +50,11 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res }), // Having req allows us to access sessions
+    context: ({ req, res }): MyContext => ({
+      em: orm.em,
+      req,
+      res,
+    }), // Having req allows us to access sessions
   });
 
   apolloServer.applyMiddleware({

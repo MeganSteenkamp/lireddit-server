@@ -13,6 +13,9 @@ import argon2 from 'argon2';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { UsernamePasswordInput } from './UsernamePasswordInput';
 import { validateRegister } from '../utils/validateRegister';
+import { sendEmail } from '../utils/sendEmail';
+import jsonwebtoken from 'jsonwebtoken';
+import { JWT_SECRET } from '../constants';
 
 // Needed to declare custom properties on an express session
 // See: https://stackoverflow.com/questions/65108033/property-user-does-not-exist-on-type-session-partialsessiondata
@@ -40,8 +43,89 @@ class UserResponse {
   user?: User;
 }
 
+@ObjectType()
+class DecodedToken {
+  @Field()
+  userId: number;
+
+  @Field()
+  iat: number;
+
+  @Field()
+  exp: number;
+}
+
 @Resolver()
 export class UserResolver {
+  @Mutation(() => UserResponse)
+  async changePassword(
+    @Arg('token') token: string,
+    @Arg('newPassword') newPassword: string,
+    @Ctx() { em }: MyContext
+  ): Promise<UserResponse> {
+    if (newPassword.length <= 2) {
+      return {
+        errors: [
+          {
+            field: 'newPassword',
+            message: 'length must be greater than 2',
+          },
+        ],
+      };
+    }
+
+    let decoded;
+    try {
+      decoded = jsonwebtoken.verify(token, JWT_SECRET);
+    } catch (err) {
+      console.log(decoded);
+      return {
+        errors: [
+          {
+            field: 'token',
+            message: 'token expired',
+          },
+        ],
+      };
+    }
+
+    const userId = (<DecodedToken>decoded).userId;
+    const user = await em.findOne(User, { id: userId });
+    if (!user) {
+      return {
+        errors: [
+          {
+            field: 'token',
+            message: 'user no longer exists',
+          },
+        ],
+      };
+    }
+
+    user.password = await argon2.hash(newPassword);
+    em.persistAndFlush(user);
+
+    return { user };
+  }
+
+  @Mutation(() => Boolean)
+  async forgotPassword(@Arg('email') email: string, @Ctx() { em }: MyContext) {
+    const user = await em.findOne(User, { email });
+    if (!user) {
+      // the email is not in the db
+      // return true so can't find out who are users are
+      return true;
+    }
+
+    const token = jsonwebtoken.sign({ userId: user.id }, JWT_SECRET, {
+      expiresIn: 1000 * 60 * 60 * 24 * 3,
+    });
+    await sendEmail(
+      email,
+      `<a href="http://localhost:3000/change-password/${token}">reset password</a>`
+    );
+    return true;
+  }
 
   @Query(() => User, { nullable: true })
   async me(@Ctx() { em, req }: MyContext) {
