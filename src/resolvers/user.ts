@@ -61,7 +61,7 @@ export class UserResolver {
   async changePassword(
     @Arg('token') token: string,
     @Arg('newPassword') newPassword: string,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     if (newPassword.length <= 2) {
       return {
@@ -78,12 +78,11 @@ export class UserResolver {
     try {
       decoded = jsonwebtoken.verify(token, JWT_SECRET);
     } catch (err) {
-      console.log(decoded);
       return {
         errors: [
           {
             field: 'token',
-            message: 'token expired',
+            message: 'this token has expired',
           },
         ],
       };
@@ -105,6 +104,9 @@ export class UserResolver {
     user.password = await argon2.hash(newPassword);
     em.persistAndFlush(user);
 
+    // log in user after change password
+    req.session.userId = user.id;
+
     return { user };
   }
 
@@ -118,7 +120,7 @@ export class UserResolver {
     }
 
     const token = jsonwebtoken.sign({ userId: user.id }, JWT_SECRET, {
-      expiresIn: 1000 * 60 * 60 * 24 * 3,
+      expiresIn: 1000 * 60 * 60 * 6, // 6 hours
     });
     await sendEmail(
       email,
