@@ -24,7 +24,7 @@ import expressConfig from './express-session.config';
 import session from 'express-session';
 
 const main = async () => {
-  const conn = await createConnection({
+  await createConnection({
     type: 'postgres',
     database: DATABASE,
     username: USERNAME,
