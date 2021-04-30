@@ -1,22 +1,38 @@
 import 'reflect-metadata';
-import { MikroORM } from '@mikro-orm/core';
-import { COOKIE_NAME, EXPRESS_SECRET, __prod__ } from './constants';
-import microConfig from './mikro-orm.config';
-import expressConfig from './express-session.config';
-import express from 'express';
+
+import {
+  COOKIE_NAME,
+  DATABASE,
+  EXPRESS_SECRET,
+  PASSWORD,
+  USERNAME,
+  __prod__,
+} from './constants';
+
 import { ApolloServer } from 'apollo-server-express';
-import { buildSchema } from 'type-graphql';
-import { PostResolver } from './resolvers/post';
-import { UserResolver } from './resolvers/user';
-import { MyContext } from './types';
-import session from 'express-session';
-import connectPg from 'connect-pg-simple';
 import { Pool } from 'pg';
+import { Post } from './entities/Post';
+import { PostResolver } from './resolvers/post';
+import { User } from './entities/User';
+import { UserResolver } from './resolvers/user';
+import { buildSchema } from 'type-graphql';
+import connectPg from 'connect-pg-simple';
 import cors from 'cors';
+import { createConnection } from 'typeorm';
+import express from 'express';
+import expressConfig from './express-session.config';
+import session from 'express-session';
 
 const main = async () => {
-  const orm = await MikroORM.init(microConfig);
-  await orm.getMigrator().up();
+  const conn = await createConnection({
+    type: 'postgres',
+    database: DATABASE,
+    username: USERNAME,
+    password: PASSWORD,
+    logging: true,
+    synchronize: true,
+    entities: [Post, User],
+  });
 
   const app = express();
 
@@ -50,8 +66,7 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({
-      em: orm.em,
+    context: ({ req, res }) => ({
       req,
       res,
     }), // Having req allows us to access sessions
