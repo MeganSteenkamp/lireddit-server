@@ -7,5 +7,4 @@ export const PORT = '5432';
 export const DATABASE = 'lireddit2';
 export const COOKIE_NAME = 'qid';
 
-export const EXPRESS_SECRET = 'H47LrdZUWuKZCT1vfHV8edEvPIoiJ8mw';
 export const JWT_SECRET = 'vPWHwad8ohedVbyCyh6DuVjjTFU3ZaL2';

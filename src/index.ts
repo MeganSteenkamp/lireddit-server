@@ -3,25 +3,24 @@ import 'reflect-metadata';
 import {
   COOKIE_NAME,
   DATABASE,
-  EXPRESS_SECRET,
   PASSWORD,
   USERNAME,
   __prod__,
 } from './constants';
 
 import { ApolloServer } from 'apollo-server-express';
-import { Pool } from 'pg';
 import { Post } from './entities/Post';
 import { PostResolver } from './resolvers/post';
 import { User } from './entities/User';
 import { UserResolver } from './resolvers/user';
 import { buildSchema } from 'type-graphql';
-import connectPg from 'connect-pg-simple';
 import cors from 'cors';
 import { createConnection } from 'typeorm';
 import express from 'express';
-import expressConfig from './express-session.config';
 import session from 'express-session';
+import redis from 'redis';
+import connectRedis from 'connect-redis';
+import { MyContext } from './types';
 
 const main = async () => {
   await createConnection({
@@ -36,9 +35,8 @@ const main = async () => {
 
   const app = express();
 
-  // Lines 22-48 for setting up session storage cookies with postgres
-  const pgSession = connectPg(session);
-  const pgPool = new Pool(expressConfig);
+  const RedisStore = connectRedis(session);
+  const redisClient = redis.createClient();
 
   app.use(
     cors({
@@ -47,17 +45,19 @@ const main = async () => {
     }),
     session({
       name: COOKIE_NAME,
-      store: new pgSession({
-        pool: pgPool,
+      store: new RedisStore({
+        client: redisClient,
+        disableTTL: true,
       }),
-      secret: EXPRESS_SECRET, // Wouldn't actually use this
-      resave: false,
-      saveUninitialized: false,
       cookie: {
         maxAge: 10 * 365 * 24 * 60 * 60 * 1000, // 10 years
+        httpOnly: true, // cannot access code in js front end
         sameSite: 'lax', // protects csrf
         secure: __prod__, // cookie works only in https
       },
+      saveUninitialized: false,
+      secret: 'keyboard cat', // should make env var
+      resave: false,
     })
   );
 
@@ -66,7 +66,7 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }) => ({
+    context: ({ req, res }): MyContext => ({
       req,
       res,
     }), // Having req allows us to access sessions
