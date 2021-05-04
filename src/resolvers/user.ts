@@ -13,8 +13,8 @@ import argon2 from 'argon2';
 import { UsernamePasswordInput } from './UsernamePasswordInput';
 import { validateRegister } from '../utils/validateRegister';
 import { sendEmail } from '../utils/sendEmail';
-import jsonwebtoken from 'jsonwebtoken';
-import { JWT_SECRET } from '../constants';
+import { COOKIE_NAME, FORGOT_PASSWORD_PREFIX } from '../constants';
+import { v4 } from 'uuid';
 
 // Needed to declare custom properties on an express session
 // See: https://stackoverflow.com/questions/65108033/property-user-does-not-exist-on-type-session-partialsessiondata
@@ -42,25 +42,13 @@ class UserResponse {
   user?: User;
 }
 
-@ObjectType()
-class DecodedToken {
-  @Field()
-  userId: number;
-
-  @Field()
-  iat: number;
-
-  @Field()
-  exp: number;
-}
-
 @Resolver()
 export class UserResolver {
   @Mutation(() => UserResponse)
   async changePassword(
     @Arg('token') token: string,
     @Arg('newPassword') newPassword: string,
-    @Ctx() { req }: MyContext
+    @Ctx() { req, redis }: MyContext
   ): Promise<UserResponse> {
     if (newPassword.length <= 2) {
       return {
@@ -73,22 +61,21 @@ export class UserResolver {
       };
     }
 
-    let decoded;
-    try {
-      decoded = jsonwebtoken.verify(token, JWT_SECRET);
-    } catch (err) {
+    const key = FORGOT_PASSWORD_PREFIX + token;
+    const userId = await redis.get(key);
+    if (!userId) {
       return {
         errors: [
           {
             field: 'token',
-            message: 'this token has expired',
+            message: 'token expired',
           },
         ],
       };
     }
 
-    const userId = (<DecodedToken>decoded).userId;
-    const user = await User.findOne(userId);
+    const userIdNum = parseInt(userId);
+    const user = await User.findOne(userIdNum);
 
     if (!user) {
       return {
@@ -102,11 +89,13 @@ export class UserResolver {
     }
 
     User.update(
-      { id: userId },
+      { id: user.id },
       {
         password: await argon2.hash(newPassword),
       }
     );
+
+    await redis.del(key);
 
     // log in user after change password
     req.session.userId = user.id;
@@ -115,7 +104,10 @@ export class UserResolver {
   }
 
   @Mutation(() => Boolean)
-  async forgotPassword(@Arg('email') email: string) {
+  async forgotPassword(
+    @Arg('email') email: string,
+    @Ctx() { redis }: MyContext
+  ) {
     const user = await User.findOne({ where: { email } });
     if (!user) {
       // the email is not in the db
@@ -123,9 +115,14 @@ export class UserResolver {
       return true;
     }
 
-    const token = jsonwebtoken.sign({ userId: user.id }, JWT_SECRET, {
-      expiresIn: 1000 * 60 * 60 * 6, // 6 hours
-    });
+    const token = v4();
+    await redis.set(
+      FORGOT_PASSWORD_PREFIX + token,
+      user.id,
+      'ex',
+      1000 * 60 * 60 * 24 * 3 // 3 days
+    );
+
     await sendEmail(
       email,
       `<a href="http://localhost:3000/change-password/${token}">reset password</a>`
@@ -218,7 +215,7 @@ export class UserResolver {
   logout(@Ctx() { req, res }: MyContext) {
     return new Promise((resolve) =>
       req.session.destroy((err) => {
-        res.clearCookie('qid');
+        res.clearCookie(COOKIE_NAME);
         if (err) {
           console.log(err);
           resolve(false);

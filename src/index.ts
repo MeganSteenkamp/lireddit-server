@@ -1,5 +1,12 @@
+import { ApolloServer } from 'apollo-server-express';
+import connectRedis from 'connect-redis';
+import cors from 'cors';
+import express from 'express';
+import session from 'express-session';
+import Redis from 'ioredis';
 import 'reflect-metadata';
-
+import { buildSchema } from 'type-graphql';
+import { createConnection } from 'typeorm';
 import {
   COOKIE_NAME,
   DATABASE,
@@ -7,19 +14,10 @@ import {
   USERNAME,
   __prod__,
 } from './constants';
-
-import { ApolloServer } from 'apollo-server-express';
 import { Post } from './entities/Post';
-import { PostResolver } from './resolvers/post';
 import { User } from './entities/User';
+import { PostResolver } from './resolvers/post';
 import { UserResolver } from './resolvers/user';
-import { buildSchema } from 'type-graphql';
-import cors from 'cors';
-import { createConnection } from 'typeorm';
-import express from 'express';
-import session from 'express-session';
-import redis from 'redis';
-import connectRedis from 'connect-redis';
 import { MyContext } from './types';
 
 const main = async () => {
@@ -36,7 +34,7 @@ const main = async () => {
   const app = express();
 
   const RedisStore = connectRedis(session);
-  const redisClient = redis.createClient();
+  const redis = new Redis();
 
   app.use(
     cors({
@@ -46,7 +44,7 @@ const main = async () => {
     session({
       name: COOKIE_NAME,
       store: new RedisStore({
-        client: redisClient,
+        client: redis,
         disableTTL: true,
       }),
       cookie: {
@@ -66,9 +64,10 @@ const main = async () => {
       resolvers: [PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({
+    context: ({ req, res }) => ({
       req,
       res,
+      redis,
     }), // Having req allows us to access sessions
   });
 
