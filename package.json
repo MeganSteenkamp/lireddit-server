@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "watch": "tsc -w",
-    "dev": "set NODE_ENV=dev.env && nodemon dist/index.js && docker start -a my-redis",
+    "docker-run": "docker run --name my-redis -p 6379:6379 -d redis redis-server --appendonly yes",
+    "docker-start": "docker start -a my-redis",
+    "dev": "set NODE_ENV=dev.env && nodemon dist/index.js",
     "start": "node dist/index.js",
     "start2": "ts-node src/index.ts"
   },
