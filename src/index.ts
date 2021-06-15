@@ -15,6 +15,7 @@ import {
   __prod__,
 } from './constants';
 import { Post } from './entities/Post';
+import { Updoot } from './entities/Updoot';
 import { User } from './entities/User';
 import { PostResolver } from './resolvers/post';
 import { UserResolver } from './resolvers/user';
@@ -27,7 +28,7 @@ const main = async () => {
     password: PASSWORD,
     logging: true,
     synchronize: true,
-    entities: [Post, User],
+    entities: [Post, User, Updoot],
   });
   await conn.runMigrations({});
 
