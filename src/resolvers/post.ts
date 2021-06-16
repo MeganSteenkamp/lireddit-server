@@ -35,12 +35,6 @@ class PaginatedPosts {
 
 @Resolver(Post)
 export class PostResolver {
-  @FieldResolver(() => String)
-  textSnippet(@Root() root: Post) {
-    // minimise body sent for cards of posts
-    return root.text.slice(0, 200);
-  }
-
   @Mutation(() => Boolean)
   @UseMiddleware(isAuth)
   async vote(
