@@ -14,6 +14,7 @@ import {
 import { MyContext } from '../types';
 import { isAuth } from '../middleware/isAuth';
 import { getConnection } from 'typeorm';
+import { Updoot } from '../entities/Updoot';
 
 @InputType()
 class PostInput {
@@ -33,31 +34,72 @@ class PaginatedPosts {
 
 @Resolver(Post)
 export class PostResolver {
-  @Mutation(() => Boolean)
+  @Mutation(() => Post, { nullable: true })
   @UseMiddleware(isAuth)
   async vote(
     @Arg('postId', () => Int) postId: number,
     @Arg('value', () => Int) value: number,
     @Ctx() { req }: MyContext
-  ) {
+  ): Promise<Post | null> {
     const isUpdoot = value !== -1;
     const realValue = isUpdoot ? 1 : -1;
     const userId = req.session.userId;
-    await getConnection().query(
-      `
-    start transaction;
 
-    insert into updoot ("userId", "postId", value)
-    values (${userId}, ${postId}, ${realValue});
-
-    update post
-    set points = points + ${realValue}
-    where id = ${postId};
-
-    commit;
-      `
-    );
-    return true;
+    const updoot = await Updoot.findOne({ where: { postId, userId } });
+    if (updoot && updoot.value !== realValue) {
+      // User has voted and is changing their vote
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `
+        update updoot
+        set value = $1
+        where "postId" = $2 and "userId" = $3
+        `,
+          [realValue, postId, userId]
+        );
+        await tm.query(
+          `update post
+          set points = points + $1
+          where id = $2`,
+          [2 * realValue, postId]
+        );
+      });
+    } else if (updoot) {
+      // user is undoing their vote
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `delete from updoot
+          where "postId" = $1 and "userId" = $2`,
+          [postId, userId]
+        );
+        await tm.query(
+          `update post
+          set points = points - $1
+          where id = $2`,
+          [realValue, postId]
+        );
+      });
+    } else if (!updoot) {
+      // new vote
+      await getConnection().transaction(async (tm) => {
+        await tm.query(
+          `insert into updoot ("userId", "postId", value)
+        values ($1, $2, $3)`,
+          [userId, postId, realValue]
+        );
+        await tm.query(
+          `update post
+          set points = points + $1
+          where id = $2`,
+          [realValue, postId]
+        );
+      });
+    }
+    const post = await Post.findOne(postId);
+    if (!post) {
+      return null;
+    }
+    return post;
   }
 
   @Query(() => PaginatedPosts)
