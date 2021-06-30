@@ -34,13 +34,13 @@ class PaginatedPosts {
 
 @Resolver(Post)
 export class PostResolver {
-  @Mutation(() => Post, { nullable: true })
+  @Mutation(() => Boolean)
   @UseMiddleware(isAuth)
   async vote(
     @Arg('postId', () => Int) postId: number,
     @Arg('value', () => Int) value: number,
     @Ctx() { req }: MyContext
-  ): Promise<Post | null> {
+  ) {
     const isUpdoot = value !== -1;
     const realValue = isUpdoot ? 1 : -1;
     const userId = req.session.userId;
@@ -79,7 +79,7 @@ export class PostResolver {
           [realValue, postId]
         );
       });
-    } else if (!updoot) {
+    } else {
       // new vote
       await getConnection().transaction(async (tm) => {
         await tm.query(
@@ -95,11 +95,7 @@ export class PostResolver {
         );
       });
     }
-    const post = await Post.findOne(postId);
-    if (!post) {
-      return null;
-    }
-    return post;
+    return true;
   }
 
   @Query(() => PaginatedPosts)
