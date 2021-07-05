@@ -136,7 +136,7 @@ export class PostResolver {
     from post as p
     inner join public.user as u
     on p."creatorId" = u.id
-    ${cursor ? `where p."createdAt" < $${cursorIndex}` : ''}
+    ${cursor ? `where p."createdAt" < $3` : ''}
     order by p."createdAt" desc
     limit $1;
     `,
