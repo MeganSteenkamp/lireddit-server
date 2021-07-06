@@ -15,6 +15,7 @@ import { MyContext } from '../types';
 import { isAuth } from '../middleware/isAuth';
 import { getConnection } from 'typeorm';
 import { Updoot } from '../entities/Updoot';
+import { User } from 'src/entities/User';
 
 @InputType()
 class PostInput {
@@ -113,9 +114,7 @@ export class PostResolver {
       replacements.push(req.session.userId);
     }
 
-    let cursorIndex = 3;
     if (cursor) {
-      cursorIndex = replacements.length;
       replacements.push(new Date(parseInt(cursor)));
     }
     const posts = await getConnection().query(
@@ -179,8 +178,12 @@ export class PostResolver {
   }
 
   @Mutation(() => Boolean)
-  async deletePost(@Arg('id') id: number): Promise<boolean> {
-    await Post.delete(id);
+  @UseMiddleware(isAuth)
+  async deletePost(
+    @Arg('id', () => Int) id: number,
+    @Ctx() { req }: MyContext
+  ): Promise<boolean> {
+    await Post.delete({ id, creatorId: req.session.userId });
     return true;
   }
 }
