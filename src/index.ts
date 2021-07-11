@@ -19,6 +19,7 @@ import { Updoot } from './entities/Updoot';
 import { User } from './entities/User';
 import { PostResolver } from './resolvers/post';
 import { UserResolver } from './resolvers/user';
+import { createUpdootLoader } from './utils/createUpdootLoader';
 import { createUserLoader } from './utils/createUserLoader';
 
 const main = async () => {
@@ -74,6 +75,7 @@ const main = async () => {
       res,
       redis,
       userLoader: createUserLoader(),
+      updootLoader: createUpdootLoader(),
     }), // Having req allows us to access sessions
   });
 
