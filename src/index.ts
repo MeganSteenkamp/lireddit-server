@@ -32,7 +32,6 @@ const main = async () => {
     synchronize: true,
     entities: [Post, User, Updoot],
   });
-
   await conn.runMigrations({});
 
   //await Post.delete({});
