@@ -65,7 +65,7 @@ export class UserResolver {
         errors: [
           {
             field: 'newPassword',
-            message: 'length must be greater than 2',
+            message: 'must have at least 3 characters',
           },
         ],
       };

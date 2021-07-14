@@ -15,7 +15,7 @@ export const validateRegister = (options: UsernamePasswordInput) => {
     return [
       {
         field: 'username',
-        message: 'length must be greater than 2',
+        message: 'must have at least 3 characters',
       },
     ];
   }
@@ -33,7 +33,7 @@ export const validateRegister = (options: UsernamePasswordInput) => {
     return [
       {
         field: 'password',
-        message: 'length must be greater than 2',
+        message: 'must have at least 3 characters',
       },
     ];
   }
